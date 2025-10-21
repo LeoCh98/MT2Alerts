@@ -86,6 +86,7 @@ def check_page():
     # === Step 5: Send email if any alert found ===
     if found_alerts:
         message = "Found items with low price:\n\n" + "\n".join(found_alerts)
+        print(message)
         send_email(message)
 
 if __name__ == "__main__":
