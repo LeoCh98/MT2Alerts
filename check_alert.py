@@ -72,8 +72,15 @@ def check_page():
             options.binary_location = p
             break
 
-    logger.info("Starting Chrome WebDriver")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    # If a remote Selenium server is provided (e.g. a Docker service in CI), use it.
+    remote_url = os.getenv("SELENIUM_REMOTE_URL")
+    if remote_url:
+        logger.info("Using remote Selenium server at %s", remote_url)
+        # webdriver.Remote will talk to the provided Selenium standalone container
+        driver = webdriver.Remote(command_executor=remote_url, options=options)
+    else:
+        logger.info("Starting local Chrome WebDriver")
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
     try:
         driver.get("https://metin2alerts.com/store")

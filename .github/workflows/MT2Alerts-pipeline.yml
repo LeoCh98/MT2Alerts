@@ -8,6 +8,13 @@ on:
 jobs:
   check-alert:
     runs-on: ubuntu-latest
+    services:
+      selenium:
+        image: selenium/standalone-chrome:latest
+        ports:
+          - 4444:4444
+        options: >-
+          --shm-size=1g
 
     steps:
       - name: Checkout repo
@@ -23,13 +30,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install selenium webdriver-manager
 
-      - name: Install Chromium and dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y chromium-browser chromium libnss3 fonts-liberation libatk1.0-0 libgtk-3-0 libx11-xcb1 libasound2
-          # export CHROME_BIN for webdriver_manager / selenium to find
-          echo "CHROME_BIN=/usr/bin/chromium-browser" >> $GITHUB_ENV
-        shell: bash
+      # Use a Selenium standalone Chrome container as a service so we don't need to apt install chromium
+      # The docker service exposes a WebDriver endpoint at http://selenium:4444
+      
 
       - name: Run script
         run: |
@@ -38,3 +41,5 @@ jobs:
           EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          # point the script to the selenium service container
+          SELENIUM_REMOTE_URL: http://localhost:4444/wd/hub
