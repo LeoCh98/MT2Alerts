@@ -2,8 +2,8 @@ name: MT2 Alerts Pipeline
 
 on:
   schedule:
-    - cron: '*/22 * * * *'  # 22 min
-  workflow_dispatch:  # Manual trigger..
+    - cron: '*/22 * * * *'  # cada 22 min
+  workflow_dispatch:
 
 jobs:
   check-alert:
@@ -21,12 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install selenium
-
-      - name: Setup ChromeDriver
-        uses: nanasess/setup-chromedriver@v1
-        with:
-          chromedriver-version: 'latest'
+          pip install selenium webdriver-manager
 
       - name: Run script
         run: python check_alert.py
