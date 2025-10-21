@@ -2,7 +2,7 @@ name: MT2 Alerts Pipeline
 
 on:
   schedule:
-    - cron: '*/22 * * * *'  # cada 22 min
+    - cron: '*/30 * * * *'  # cada 30 min
   workflow_dispatch:
 
 jobs:
