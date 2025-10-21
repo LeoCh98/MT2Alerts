@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 EMAIL_TO = os.getenv("EMAIL_TO")
+# Price threshold (items with price <= this will trigger an alert).
+# Fixed constant per user's request (Option A).
+PRICE_THRESHOLD = 10000
 
 def send_email(message):
     if not (EMAIL_ADDRESS and EMAIL_PASSWORD and EMAIL_TO):
@@ -104,8 +107,8 @@ def check_page():
 
         time.sleep(4)
 
-        # === Step 4: Iterate over first 5 items ===
-        rows = driver.find_elements(By.XPATH, "//table//tr")[:5]
+        # === Step 4: Iterate over first items (expand to first 10 by default) ===
+        rows = driver.find_elements(By.XPATH, "//table//tr")[:10]
         found_alerts = []
 
         for row in rows:
@@ -128,7 +131,11 @@ def check_page():
                 precio = int(precio_texto) if precio_texto.isdigit() else None
 
                 if precio is not None:
-                    if precio < 1000:
+                    # Print/log the comparison so we can debug why an item triggers or not
+                    is_alert = precio <= PRICE_THRESHOLD
+                    logger.info("Item parsed: %s | precio=%s | threshold=%s | alert=%s", nombre_completo, precio, PRICE_THRESHOLD, is_alert)
+                    # Trigger alert if price is less than or equal to threshold
+                    if is_alert:
                         found_alerts.append(f"{nombre_completo} ({precio} Yang)")
             except Exception:
                 continue
