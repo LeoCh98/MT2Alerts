@@ -23,7 +23,7 @@ EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 EMAIL_TO = os.getenv("EMAIL_TO")
 
 # Price threshold..
-PRICE_THRESHOLD = 1000
+PRICE_THRESHOLD = 10000
 
 def send_email(message, html_message=None):
     if not (EMAIL_ADDRESS and EMAIL_PASSWORD and EMAIL_TO):
