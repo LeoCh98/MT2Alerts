@@ -3,6 +3,7 @@ import os
 import time
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -12,33 +13,40 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# Configure logging
+# Configure logging..
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
-# Environment variables (expected to be provided in GitHub Actions secrets)
+# Environment variables..
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 EMAIL_TO = os.getenv("EMAIL_TO")
-# Price threshold (items with price <= this will trigger an alert).
-# Fixed constant per user's request (Option A).
-PRICE_THRESHOLD = 10000
 
-def send_email(message):
+# Price threshold..
+PRICE_THRESHOLD = 1000
+
+def send_email(message, html_message=None):
     if not (EMAIL_ADDRESS and EMAIL_PASSWORD and EMAIL_TO):
         logger.error("Email credentials or recipient missing. Skipping send_email.")
         return False
 
-    msg = MIMEText(message)
+    msg = MIMEMultipart("alternative")
     msg['Subject'] = "MT2 Alert Notification"
     msg['From'] = EMAIL_ADDRESS
     msg['To'] = EMAIL_TO
+
+    # Attach plain text
+    part1 = MIMEText(message, "plain")
+    msg.attach(part1)
+    # Attach HTML if provided
+    if html_message:
+        part2 = MIMEText(html_message, "html")
+        msg.attach(part2)
 
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
             smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
             smtp.send_message(msg)
-        logger.info("Email sent successfully to %s", EMAIL_TO)
         return True
     except Exception as e:
         logger.exception("Failed to send email: %s", e)
@@ -46,22 +54,21 @@ def send_email(message):
 
 
 def check_page():
-    # validate env early so we avoid starting the browser when configuration is missing
+    # Validate env config..
     if not (EMAIL_ADDRESS and EMAIL_PASSWORD and EMAIL_TO):
         logger.error("Required environment variables EMAIL_ADDRESS, EMAIL_PASSWORD or EMAIL_TO are not set.\n"
                      "Please add them as secrets in GitHub (Settings -> Secrets) or export them locally before running.")
         raise SystemExit(1)
 
-    # Configure headless browser
+    # Configure headless browser..
     options = Options()
-    # Use the new headless mode when supported, fallback to legacy if needed
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
 
-    # Try to detect a Chrome/Chromium binary on the system (GitHub runners commonly have /usr/bin/chromium)
+    # Try to detect a Chrome/Chromium binary on the system..
     chrome_paths = [
         os.environ.get("CHROME_BIN"),
         "/usr/bin/chromium",
@@ -75,7 +82,7 @@ def check_page():
             options.binary_location = p
             break
 
-    # If a remote Selenium server is provided (e.g. a Docker service in CI), use it.
+    # If a remote Selenium server is provided, use it. (Not set in this version..)
     remote_url = os.getenv("SELENIUM_REMOTE_URL")
     if remote_url:
         logger.info("Using remote Selenium server at %s", remote_url)
@@ -131,24 +138,35 @@ def check_page():
                 precio = int(precio_texto) if precio_texto.isdigit() else None
 
                 if precio is not None:
+                    # Seller/vendedor (column 6)
+                    try:
+                        vendedor_element = row.find_element(By.XPATH, ".//td[6]")
+                        vendedor = vendedor_element.text.strip()
+                    except Exception:
+                        vendedor = "(unknown)"
+
                     # Print/log the comparison so we can debug why an item triggers or not
                     is_alert = precio <= PRICE_THRESHOLD
-                    logger.info("Item parsed: %s | precio=%s | threshold=%s | alert=%s", nombre_completo, precio, PRICE_THRESHOLD, is_alert)
                     # Trigger alert if price is less than or equal to threshold
                     if is_alert:
-                        found_alerts.append(f"{nombre_completo} ({precio} Yang)")
+                        found_alerts.append((nombre_completo, precio, vendedor))
             except Exception:
                 continue
 
         # === Step 5: Send email if any alert found ===
         if found_alerts:
-            message = "Found items with low price:\n\n" + "\n".join(found_alerts)
-            logger.info(message)
-            success = send_email(message)
+            message = "Found items with low price:\n\n" + "\n".join(
+                f"(Item: {nombre}) ({precio} Yang) — Vendedor: {vendedor}" for nombre, precio, vendedor in found_alerts
+            )
+            html_alerts = []
+            for nombre, precio, vendedor in found_alerts:
+                html_alerts.append(
+                    f"<p>(Item: <b>{nombre}</b>) (<b>{precio}</b> Yang) — Vendedor: <b>{vendedor}</b></p>"
+                )
+            html_message = "<html><body><h2>Found items with low price:</h2>" + "".join(html_alerts) + "</body></html>"
+            success = send_email(message, html_message)
             if not success:
                 logger.error("send_email reported failure. Check SMTP settings and credentials.")
-        else:
-            logger.info("No alerts found in this check.")
         return True
     finally:
         logger.info("Quitting WebDriver")
