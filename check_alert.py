@@ -182,4 +182,4 @@ if __name__ == "__main__":
         # already logged helpful error message
         raise
     except Exception as e:
-        logger.exception("Unhandled error while running check_page: %s", e)
+        logger.exception("Unhandled error while running: %s", e)
